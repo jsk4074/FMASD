@@ -1,0 +1,217 @@
+Metadata-Version: 2.4
+Name: sans
+Version: 0.1.3
+Summary: This package is for SANS.
+Home-page: https://github.com/jsk4074/SANS
+Author: JeongSik Kim
+Author-email: 2343783@donga.ac.kr
+License: MIT
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Requires-Python: >=3.8.0
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: matplotlib
+Requires-Dist: diffusers
+Requires-Dist: tqdm
+Requires-Dist: gradio
+Requires-Dist: pyyaml
+Requires-Dist: einops
+Requires-Dist: chardet
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: soundfile
+Requires-Dist: librosa>=0.10.0
+Requires-Dist: scipy
+Requires-Dist: pandas
+Requires-Dist: torchlibrosa>=0.0.9
+Requires-Dist: transformers>=4.29.0
+Requires-Dist: progressbar
+Requires-Dist: ftfy
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+
+# SANS: Sound Anomaly detectioN Synthesis (WACV 2026)
+
+[![arXiv](https://img.shields.io/badge/arXiv-2301.12503-brightgreen.svg?style=flat-square)](https://arxiv.org/abs/2301.12503)  [![githubio](https://img.shields.io/badge/GitHub.io-Audio_Samples-blue?logo=Github&style=flat-square)](https://sans.github.io/) [![Replicate](https://replicate.com/jagilley/audio-ldm/badge)](https://replicate.com/jagilley/audio-ldm)
+
+<!-- # [![PyPI version](https://badge.fury.io/py/voicefixer.svg)](https://badge.fury.io/py/voicefixer) -->
+
+A metadata-free pipeline for unsupervised anomalous sound detection (ASD) that (1) synthesizes normal audio with a text-to-audio model and (2) generates controllable anomalous spectrograms via gradient-ascent perturbations in latent space.
+WACV 2026 submission.
+
+<hr>
+
+TL;DR
+
+SANS builds an ASD system without fault labels or metadata. We:
+
+adapt a pretrained text-to-audio model (Tango) with LoRA to synthesize diverse normal sounds from automatically generated prompts;
+
+train a reconstruction model on those normals;
+
+create anomalous examples by gradient-ascent in the encoder’s latent space with truncated projection;
+
+convert ascent masks into realistic spectrogram anomalies (Perlin-guided, cut-paste, etc.);
+
+train a lightweight discriminator on (normal vs. synthetic-anomaly) embeddings;
+
+perform inference with the frozen encoder + discriminator.
+
+# Change Log
+
+**2025-sep-16**: init commit.
+
+## Prepare running environment
+```shell
+conda create -n sans python=3.8; conda activate sans
+pip3 install git+https://github.com/jsk4074/SANS.git
+git clone https://github.com/jsk4074/SANS; cd SANS
+```
+
+## Commandline Usage
+Prepare running environment
+```shell
+# Optional
+conda create -n sans python=3.8; conda activate sans
+# Install SANS
+pip3 install git+https://github.com/jsk4074/SANS.git
+```
+
+:star2: **Audio-to-Audio Generation**: generate an audio guided by an audio (output will have similar audio events as the input audio file).
+```shell
+sans --file_path trumpet.wav
+# Result will be saved in "./output/generation_audio_to_audio/trumpet"
+```
+
+:gear: How to choose between different model checkpoints?
+```
+# Add the --model_name parameter, choice={audioldm-m-text-ft, audioldm-s-text-ft, audioldm-m-full, audioldm-s-full,audioldm-l-full,audioldm-s-full-v2}
+audioldm --model_name audioldm-s-full
+```
+
+- :star: audioldm-m-full (default, **recommend**): the medium AudioLDM without finetuning and trained with audio embeddings as condition *(added 2023-04-10)*.
+- :star: audioldm-s-full (**recommend**): the original open-sourced version *(added 2023-02-01)*.
+- :star: audioldm-s-full-v2 (**recommend**): more training steps comparing with audioldm-s-full *(added 2023-03-04)*.
+- audioldm-s-text-ft: the small AudioLDM finetuned with AudioCaps and MusicCaps audio-text pairs *(added 2023-04-10)*.
+- audioldm-m-text-ft: the medium large AudioLDM finetuned with AudioCaps and MusicCaps audio-text pairs *(added 2023-04-10)*.
+- audioldm-l-full: larger model comparing with audioldm-s-full *(added 2023-03-04)*.
+
+> @haoheliu personally did a evaluation regarding the overall quality of the checkpoint, which gives audioldm-m-full (6.85/10), audioldm-s-full (6.62/10), audioldm-s-text-ft (6/10), audioldm-m-text-ft (5.46/10). These score are only for reference and may not reflect the true performance of the checkpoint. Checkpoint performance also varying with different text input as well.
+
+:grey_question: For more options on guidance scale, batchsize, seed, ddim steps, etc., please run
+```shell
+audioldm -h
+
+```console
+usage: audioldm [-h] [--mode {generation,transfer}] [-t TEXT] [-f FILE_PATH] [--transfer_strength TRANSFER_STRENGTH] [-s SAVE_PATH] [--model_name {audioldm-s-full,audioldm-l-full,audioldm-s-full-v2}] [-ckpt CKPT_PATH]
+                [-b BATCHSIZE] [--ddim_steps DDIM_STEPS] [-gs GUIDANCE_SCALE] [-dur DURATION] [-n N_CANDIDATE_GEN_PER_TEXT] [--seed SEED]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --mode {generation,transfer}
+                        generation: text-to-audio generation; transfer: style transfer
+  -t TEXT, --text TEXT  Text prompt to the model for audio generation, DEFAULT ""
+  -f FILE_PATH, --file_path FILE_PATH
+                        (--mode transfer): Original audio file for style transfer; Or (--mode generation): the guidance audio file for generating simialr audio, DEFAULT None
+  --transfer_strength TRANSFER_STRENGTH
+                        A value between 0 and 1. 0 means original audio without transfer, 1 means completely transfer to the audio indicated by text, DEFAULT 0.5
+  -s SAVE_PATH, --save_path SAVE_PATH
+                        The path to save model output, DEFAULT "./output"
+  --model_name {audioldm-s-full,audioldm-l-full,audioldm-s-full-v2}
+                        The checkpoint you gonna use, DEFAULT "audioldm-s-full"
+  -ckpt CKPT_PATH, --ckpt_path CKPT_PATH
+                        (deprecated) The path to the pretrained .ckpt model, DEFAULT None
+  -b BATCHSIZE, --batchsize BATCHSIZE
+                        Generate how many samples at the same time, DEFAULT 1
+  --ddim_steps DDIM_STEPS
+                        The sampling step for DDIM, DEFAULT 200
+  -gs GUIDANCE_SCALE, --guidance_scale GUIDANCE_SCALE
+                        Guidance scale (Large => better quality and relavancy to text; Small => better diversity), DEFAULT 2.5
+  -dur DURATION, --duration DURATION
+                        The duration of the samples, DEFAULT 10
+  -n N_CANDIDATE_GEN_PER_TEXT, --n_candidate_gen_per_text N_CANDIDATE_GEN_PER_TEXT
+                        Automatic quality control. This number control the number of candidates (e.g., generate three audios and choose the best to show you). A Larger value usually lead to better quality with heavier computation, DEFAULT 3
+  --seed SEED           Change this value (any integer number) will lead to a different generation result. DEFAULT 42
+```
+
+For the evaluation of audio generative model, please refer to [audioldm_eval](https://github.com/haoheliu/audioldm_eval).
+
+
+```python
+from diffusers import AudioLDMPipeline
+import torch
+
+repo_id = "cvssp/audioldm-s-full-v2"
+pipe = AudioLDMPipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
+pipe = pipe.to("cuda")
+
+prompt = "Techno music with a strong, upbeat tempo and high melodic riffs"
+audio = pipe(prompt, num_inference_steps=10, audio_length_in_s=5.0).audios[0]
+```
+
+# TODO
+
+<!-- [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/haoheliuP)
+
+- [x] Update the checkpoint with more training steps.
+- [x] Update the checkpoint with more parameters (audioldm-l).
+- [ ] Add AudioCaps finetuned AudioLDM-S model
+- [x] Build pip installable package for commandline use
+- [x] Build Gradio web application
+- [ ] Add super-resolution, inpainting into Gradio web application
+- [ ] Add style-transfer into Gradio web application
+- [x] Add text-guided style transfer
+- [x] Add audio-to-audio generation
+- [x] Add audio super-resolution
+- [x] Add audio inpainting -->
+
+## Cite this work
+
+If you found this tool useful, please consider citing
+```bibtex
+<!-- @article{#################,
+  title={{AudioLDM}: Text-to-Audio Generation with Latent Diffusion Models},
+  author={Liu, Haohe and Chen, Zehua and Yuan, Yi and Mei, Xinhao and Liu, Xubo and Mandic, Danilo and Wang, Wenwu and Plumbley, Mark D},
+  journal={Proceedings of the International Conference on Machine Learning},
+  year={2023},
+  pages={21450-21474}
+} -->
+```
+
+<!-- # Hardware requirement
+- GPU with 8GB of dedicated VRAM
+- A system with a 64-bit operating system (Windows 7, 8.1 or 10, Ubuntu 16.04 or later, or macOS 10.13 or later) 16GB or more of system RAM -->
+
+<!-- ## Reference
+Part of the code is borrowed from the following repos. We would like to thank the authors of these repos for their contribution. 
+
+> https://github.com/LAION-AI/CLAP
+
+> https://github.com/CompVis/stable-diffusion
+
+> https://github.com/v-iashin/SpecVQGAN 
+
+> https://github.com/toshas/torch-fidelity -->
+
+
+<!-- We build the model with data from AudioSet, Freesound and BBC Sound Effect library. We share this demo based on the UK copyright exception of data for academic research.  -->
+
+<!-- This code repo is strictly for research demo purpose only. For commercial use please contact us. -->
