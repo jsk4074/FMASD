@@ -5,7 +5,7 @@
 <!-- # [![PyPI version](https://badge.fury.io/py/voicefixer.svg)](https://badge.fury.io/py/voicefixer) -->
 
 A metadata-free pipeline for unsupervised anomalous sound detection (ASD) that (1) synthesizes normal audio with a text-to-audio model and (2) generates controllable anomalous spectrograms via gradient-ascent perturbations in latent space.
-WACV 2026 submission.
+ICASSP 2026 submission.
 
 <hr>
 
